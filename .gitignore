@@ -1,0 +1,27 @@
+# Local environments, dependencies, and build artifacts
+node_modules/
+.tools/
+.venv/
+.tts-venv/
+target-install/
+__pycache__/
+*.py[cod]
+native/vendor/
+# Private backups and machine-specific reports
+backups/
+.env
+.env.*
+*.key
+*.pem
+native/*.json
+research/*verification.json
+# Recordings, previews, screenshots and downloaded model weights
+*.wav
+*.mp3
+*.ogg
+*.png
+*.onnx
+assets/voices/
+
+# Generated interface cues are project assets
+!assets/sounds/*.wav

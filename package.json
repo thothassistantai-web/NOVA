@@ -1,0 +1,21 @@
+{
+  "name": "nova-desktop",
+  "private": true,
+  "version": "0.2.0",
+  "scripts": {
+    "start": "./launch_nova.sh",
+    "dev": "./launch_nova.sh",
+    "check": "/usr/bin/python3 -m py_compile native/nova.py",
+    "test": "QT_QPA_PLATFORM=offscreen /usr/bin/python3 -m unittest discover -s native -p \"test*.py\""
+  },
+  "dependencies": {
+    "@tauri-apps/cli": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.2.0"
+  }
+}
