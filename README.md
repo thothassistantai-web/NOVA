@@ -1,5 +1,19 @@
 # NOVA desktop orb
 
+## Current voice experience
+
+The compact dock provides chat, microphone, an animated blue orb, speaker mute and a separate end-conversation button. Controls fade while idle, leaving the orb; hover reveals them. Listening text scrolls to the newest words. The orb reacts to microphone level, with distinct thinking and speaking animations. Muting spoken replies preserves the active conversation and model request.
+
+Continuous follow-up listening, automatic turn detection, click-to-interrupt and periodic Groq transcript previews are implemented. Speech is currently buffered as one reply to avoid playback gaps. Acoustic interruption is disabled on the installed machine because its echo-cancelled microphone was unreliable. This is not yet equivalent to ChatGPT’s full-duplex voice experience.
+
+Run `npm test` for regression checks. Credentials, recordings, local profiles, logs and downloaded models are excluded from this repository. The setup still relies on locally installed speech environments and agent integrations.
+
+Design reference: [OpenAI Realtime conversation lifecycle](https://developers.openai.com/api/docs/guides/realtime-conversations), including automatic turn detection and interruption handling. NOVA’s present implementation uses its existing providers rather than that API.
+
+## Earlier implementation notes
+
+The sections below record the project’s evolution; the current summary above and later corrective updates take precedence.
+
 The working desktop application is `native/nova.py`, using the system's PyQt5 runtime. Launch it with `./launch_nova.sh` or the **NOVA Blue Orb** application-menu entry. A browser server and Tauri CLI are not needed for this runtime.
 
 ## Controls

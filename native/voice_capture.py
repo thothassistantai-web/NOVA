@@ -73,6 +73,7 @@ class Capture(QThread):
                     last_prediction=now
                     if self.endpoint(bytes(audio),self.detector.silence):break
                 elif not self.endpoint and completed:break
+            if self.finished_input.is_set() and not heard:idle=True
             if not idle and not self.cancelled.is_set() and not heard:raise RuntimeError("I didn't hear speech. Try again.")
             if heard and not self.cancelled.is_set():
                 with wave.open(self.path,'wb') as output:

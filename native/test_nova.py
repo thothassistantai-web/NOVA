@@ -20,7 +20,7 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(nova.config['tts_volume_percent'],125)
         self.assertIn('125%',self.orb.panel.volume_label.text())
     def tearDown(self):
-        self.orb.stop(); self.orb.timer.stop(); self.orb.panel.hide(); self.orb.hide(); self.orb.tray.hide()
+        self.orb.stop(); self.orb.timer.stop(); self.orb.compact.idle_fade.stop(); self.orb.compact.hide(); self.orb.panel.hide(); self.orb.hide(); self.orb.tray.hide()
     def test_left_click_starts_voice_without_opening_chat(self):
         with patch.object(self.orb,'record') as record:
             QTest.mouseClick(self.orb,Qt.LeftButton,pos=QPoint(48,48))

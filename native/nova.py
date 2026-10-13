@@ -110,7 +110,7 @@ class Transcribe(QThread):
 
 class VoiceControl(QPushButton):
     def __init__(self,kind):
-        super().__init__('');self.level=0.0;self.kind=kind;self.tint='#e7e7ea'
+        super().__init__('');self.level=0.0;self.phase=0.;self.state='Idle';self.muted=False;self.kind=kind;self.tint='#e7e7ea'
     def paintEvent(self,event):
         p=QPainter(self);p.setRenderHint(QPainter.Antialiasing);p.setPen(Qt.NoPen);p.setBrush(QColor('#303039' if self.underMouse() else '#1b1b1e'));
         if self.kind!=2:p.drawEllipse(0,0,37,37)
@@ -120,39 +120,55 @@ class VoiceControl(QPushButton):
         elif self.kind==1:
             p.drawRoundedRect(16,9,6,13,3,3);p.drawArc(12,12,14,14,180*16,180*16);p.drawLine(19,26,19,30)
         elif self.kind==2:
-            g=QRadialGradient(17,14,16);g.setColorAt(0,QColor('#d4e1ff'));g.setColorAt(1,QColor('#739cff'));p.setBrush(g);p.setPen(Qt.NoPen);radius=12.5+self.level*5;p.drawEllipse(QPoint(18,18),int(radius),int(radius))
+            g=QRadialGradient(17,14,16);g.setColorAt(0,QColor('#d4e1ff'));g.setColorAt(1,QColor('#739cff'));p.setBrush(g);p.setPen(Qt.NoPen);radius=12.5+self.level*4+math.sin(self.phase*2)*.8;p.drawEllipse(QPoint(18,18),int(radius),int(radius))
+            p.setBrush(Qt.NoBrush);p.setPen(QPen(QColor('#91ccff'),1.2))
+            if self.state in ('Thinking','Transcribing','Preparing voice'):p.drawArc(2,2,32,32,int(self.phase*150*16)%5760,100*16)
+            elif self.state=='Listening':p.drawEllipse(QPoint(18,18),17,17)
+            elif self.state=='Speaking':
+                for x in range(10,28,4):
+                    h=3+int(4*(1+math.sin(self.phase*7+x)));p.drawLine(x,18-h,x,18+h)
+        elif self.kind==4:
+            p.drawLine(13,13,25,25);p.drawLine(25,13,13,25)
         else:
             p.drawRect(10,16,4,6);p.drawLine(14,16,20,11);p.drawLine(20,11,20,27);p.drawLine(20,27,14,22);p.drawArc(19,12,10,15,-70*16,140*16);p.drawArc(20,9,13,21,-65*16,130*16)
+
+        if self.muted:
+            p.setPen(QPen(QColor('#ffb6ac'),2));p.drawLine(10,28,28,10)
+        p.end()
 
 class CompactVoice(QWidget):
     """Movable voice dock using the existing orb controller and its live state."""
     def __init__(self,orb):
         super().__init__(None,Qt.Tool|Qt.FramelessWindowHint|Qt.WindowStaysOnTopHint)
         self.orb=orb;self.setWindowTitle('NOVA Compact Voice');self.setAttribute(Qt.WA_TranslucentBackground)
-        self.resize(246,106);layout=QVBoxLayout(self);layout.setContentsMargins(15,5,15,5);layout.setSpacing(7)
+        self.resize(284,116);layout=QVBoxLayout(self);layout.setContentsMargins(15,5,15,5);layout.setSpacing(7)
         row=QHBoxLayout();row.setContentsMargins(18,0,18,0);row.setSpacing(3)
         self.buttons=[]
-        for text,tip,callback in [('✎','Open text chat',orb.toggle),('♩','Start / stop microphone',self.toggle_mic),('●','Start voice / interrupt reply',orb.voice_click),('◖))','Enable / mute spoken replies',self.toggle_audio)]:
+        for text,tip,callback in [('✎','Open text chat',orb.toggle),('♩','Start / stop microphone',self.toggle_mic),('●','Start voice / interrupt reply',orb.voice_click),('◖))','Enable / mute spoken replies',self.toggle_audio),('×','End conversation',orb.stop)]:
             b=VoiceControl(len(self.buttons));b.setFixedSize(37,37);b.setToolTip(tip);b.setAccessibleName(tip);b.clicked.connect(callback);row.addWidget(b);self.buttons.append(b)
         layout.addLayout(row)
         self.status=QLineEdit('Ready');self.status.setReadOnly(True);self.status.setFocusPolicy(Qt.NoFocus);self.status.setFixedHeight(36);self.status.setContentsMargins(13,0,8,0)
-        self.status.setStyleSheet('color:#a8a8ad;background:#222225;border:1px solid #454549;border-radius:16px;font-size:11px;')
+        self.status.setStyleSheet('color:#d7e8ff;background:#142033;border:1px solid #34516c;border-radius:16px;font-size:12px;padding:0 10px;')
+        self.status.setAccessibleName('Live voice transcript and status')
         layout.addWidget(self.status)
         self.hovered=False;self.fade_effects=[];self.fade_animations=[]
-        for widget in [self.buttons[0],self.buttons[1],self.buttons[3],self.status]:
+        for widget in [self.buttons[0],self.buttons[1],self.buttons[3],self.buttons[4],self.status]:
             effect=QGraphicsOpacityEffect(widget);widget.setGraphicsEffect(effect)
             animation=QPropertyAnimation(effect,b'opacity',self);animation.setDuration(350);animation.setEasingCurve(QEasingCurve.InOutQuad)
             self.fade_effects.append(effect);self.fade_animations.append(animation)
         self.idle_fade=QTimer(self);self.idle_fade.setSingleShot(True);self.idle_fade.setInterval(1200);self.idle_fade.timeout.connect(self.fade_idle)
         self.refresh()
     def refresh(self):
-        state=self.orb.state;labels={'Idle':'Ready','Thinking':'Thinking / running request','Ready':'Opening microphone…','Listening':'Listening…','Speaking':'Speaking…','Preparing voice':'Preparing voice…','Error':'Check chat for details'}
+        state=self.orb.state;labels={'Idle':'Tap the orb to talk','Transcribing':'Understanding your words…','Thinking':'Thinking… · tap orb to interrupt','Ready':'Opening microphone…','Listening':'Listening…','Speaking':'Speaking… · tap orb to interrupt','Preparing voice':'Preparing voice…','Error':'Check chat for details'}
         text=('Listening: '+self.orb.live_transcript) if state=='Listening' and self.orb.live_transcript else labels.get(state,state)
         self.status.setText(text);self.status.setCursorPosition(len(text));self.status.setToolTip(text)
         for i,b in enumerate(self.buttons):
             color='#a8caff' if i==2 else '#e7e7ea'
             if i==1 and self.orb.voice_chat_active:color='#73c7ff'
-            if i==3 and not self.orb.panel.speak.isChecked():color='#77777c'
+            if i==3 and config.get('voice_muted',False):color='#77777c'
+            if i==4:color='#ffb6ac'
+            b.muted=i==3 and config.get('voice_muted',False)
+            if i==2:b.state=state
             b.tint=color;b.update()
         if state=='Idle' and not self.hovered:
             if not self.idle_fade.isActive():self.idle_fade.start()
@@ -160,11 +176,11 @@ class CompactVoice(QWidget):
 
     def reveal_controls(self):
         self.idle_fade.stop()
-        for widget,animation,effect in zip([self.buttons[0],self.buttons[1],self.buttons[3],self.status],self.fade_animations,self.fade_effects):
+        for widget,animation,effect in zip([self.buttons[0],self.buttons[1],self.buttons[3],self.buttons[4],self.status],self.fade_animations,self.fade_effects):
             widget.setEnabled(True);animation.stop();animation.setStartValue(effect.opacity());animation.setEndValue(1.0);animation.start()
     def fade_idle(self):
         if self.orb.state!='Idle' or self.hovered:return
-        for widget,animation,effect in zip([self.buttons[0],self.buttons[1],self.buttons[3],self.status],self.fade_animations,self.fade_effects):
+        for widget,animation,effect in zip([self.buttons[0],self.buttons[1],self.buttons[3],self.buttons[4],self.status],self.fade_animations,self.fade_effects):
             widget.setEnabled(False);animation.stop();animation.setStartValue(effect.opacity());animation.setEndValue(0.0);animation.start()
     def enterEvent(self,event):self.hovered=True;self.reveal_controls();super().enterEvent(event)
     def leaveEvent(self,event):
@@ -178,7 +194,9 @@ class CompactVoice(QWidget):
     def toggle_audio(self):
         self.orb.panel.speak.setChecked(not self.orb.panel.speak.isChecked())
         config['voice_muted']=not self.orb.panel.speak.isChecked()
-        if not self.orb.panel.speak.isChecked():self.orb.stop()
+        if config['voice_muted'] and self.orb.voice and not self.orb.worker:
+            self.orb.stop_voice();self.orb.stop_barge_monitor();self.orb.set_state('Idle')
+            self.orb.resume_conversation(self.orb.listen_generation)
         self.refresh()
     def mousePressEvent(self,e):
         if e.button()==Qt.LeftButton:self.start=e.globalPos();self.origin=self.pos()
@@ -230,7 +248,7 @@ class Orb(QWidget):
         self.compact_mode=not self.compact_mode;self.settings.setValue('compact-mode',self.compact_mode);self.apply_compact()
     def tick(self):
         self.phase+=.05;self.voice_level*=.85;self.update()
-        self.compact.buttons[2].level=self.voice_level;self.compact.buttons[2].update()
+        self.compact.buttons[2].level=self.voice_level;self.compact.buttons[2].phase=self.phase;self.compact.buttons[2].update()
         if self.cue_process and self.cue_process.poll() is not None:self.cue_process=None
 
     def set_state(self,state):
@@ -354,7 +372,12 @@ class Orb(QWidget):
         if self.stream_voice and self.voice is self.stream_voice:
             self.pending_reply['text']=text
             if not self.stream_text.endswith(text):self.stream_voice.add_text(text)
-            self.stream_voice.finish_input()
+            if config.get('voice_muted',False):
+                self.pending_reply=None;self.stop_voice()
+                self.histories[provider].append({'role':'assistant','content':text});self.set_state('Idle')
+                if self.voice_chat_active:self.resume_conversation(self.listen_generation)
+            else:
+                self.set_state('Preparing voice');self.stream_voice.finish_input()
         else:
             self.histories[provider].append({'role':'assistant','content':text});self.set_state('Idle')
             if (getattr(task,'voice_reply',False) or self.panel.speak.isChecked()) and not config.get('voice_muted',False):self.speak_text(text)
@@ -450,7 +473,7 @@ class Orb(QWidget):
         self.recorder=None
         if self.partial_worker:
             partial=self.partial_worker;self.partial_worker=None;partial.cancel();self.retired.append(partial)
-        self.play_cue('listen-stop');self.panel.mic.setText('Record voice');self.set_state('Thinking')
+        self.play_cue('listen-stop');self.panel.mic.setText('Record voice');self.set_state('Transcribing')
         task=Transcribe(path,capture.auto_send);self.worker=task
         task.result.connect(lambda text:self.transcribed(task,text));task.error.connect(lambda text:self.transcription_failed(task,text))
         task.finished.connect(lambda:self.cleanup(task));task.start()
